@@ -5,11 +5,11 @@
 import numpy as np
 import math
 from six.moves.configparser import RawConfigParser
-
+nof_shafts = 10
+nof_treadles = nof_shafts
 
 def read_wif(config, filename):
     config.read(filename)
-
     string = 'Treadles' + str(config.getint('WEAVING', 'Treadles'))
     print(string)
 
@@ -30,7 +30,6 @@ def read_wif(config, filename):
     threading = {}
     for thread_no, value in config.items('THREADING'):
         threading[int(thread_no)] = int(value)
-    print(threading)
     return config
 
 
@@ -71,12 +70,10 @@ def init_wif(config):
     config.set('WIF', 'Developers', 'Gijs')
     config.set('WIF', 'Source Program', 'MyScript')
     config.set('WEAVING', 'Rising Shed', 'true')
-    config.set('WEAVING', 'Treadles', '10')
-    config.set('WEAVING', 'Shafts', '10')
+    config.set('WEAVING', 'Treadles', nof_treadles)
+    config.set('WEAVING', 'Shafts', nof_shafts)
     config.set('WARP', 'Units', 'centimeters')
-#    config.set('WARP', 'Color', '1')
-    config.set('WEFT', 'Units', 'centimeters')
-#    config.set('WEFT', 'Color', '1')
+    config.set('WARP', 'Color', '1')
     config.set('COLOR TABLE', '1', '999, 0, 0')
     config.set('COLOR TABLE', '2', '0, 0, 999')
     config.set('COLOR TABLE', '3', '0, 999, 0')
@@ -90,6 +87,7 @@ def init_wif(config):
     return config
 
 def write_wif(config, filename, threads, treadles, nof_warp_color = 1, nof_weft_color = 2):
+
     for index in range(len(threads)):
         config.set('THREADING', str(index + 1), str(threads[index]))
         config.set('WARP COLORS', str(index + 1), str(1+(index % nof_warp_color)))
@@ -105,12 +103,13 @@ def write_wif(config, filename, threads, treadles, nof_warp_color = 1, nof_weft_
     config.set('WARP', 'Threads', len(threads))
     config.set('WEFT', 'Threads', len(treadles))
 
+    tieup(config)
     with open(filename, 'w') as f:
         config.write(f)
     return config
 
 
-def design_line(nof_threads=100, shafts=10 ):
+def design_line(nof_threads=100, shafts=nof_shafts):
     threads = []
     for draad in range(nof_threads):
         ampl = nof_threads * (1 + np.sin((1 * np.pi / nof_threads) * draad))/2.5
@@ -126,6 +125,20 @@ def read_threads(config):
         threads.append(r_threads[cnt+1])
     return threads
 
+def tieup(config):
+    config.add_section('TIEUP')
+    config.set('CONTENTS', 'TIEUP', 'true')
+    if nof_shafts == 10:
+        line = [3, 8, 9, 10]
+    else:
+        line = [2,4,7,8]
+    for cnt in range(nof_shafts):
+        config.set('TIEUP', str(nof_shafts-cnt), str(line))
+        for cnt_2 in range(len(line)):
+            shaft = line[cnt_2] + 1
+            if shaft > nof_shafts:
+                shaft = shaft - nof_shafts
+            line[cnt_2] = shaft
 
 def extent(i_threads, extent_factor = 3 ):
     r_threads = []
@@ -154,7 +167,7 @@ def network(threads, shafts):
 def interleave(threads, shafts, x_offset, y_offset=0):
     r_threads = []
     offset_a = math.floor(x_offset/2)
-    offset_b = len(threads)-offset_a
+    offset_b = 0#len(threads)-offset_a
     for cnt in range(len(threads)):
         r_threads.append(threads[(cnt + offset_a) % len(threads)])
 #        r_threads.append(threads[cnt]) #(cnt + x_offset) % len(threads)])
@@ -168,7 +181,7 @@ def main():
     config = RawConfigParser()
     if make_new_wif:
         init_wif(config)
-        threads = design_line(nof_threads=100, shafts=10)
+        threads = design_line(nof_threads=100, shafts=nof_shafts)
         write_wif(config, filename, threads, threads, nof_warp_color=1, nof_weft_color=1)
     else:
         config = read_wif(config, filename)
@@ -176,8 +189,8 @@ def main():
         threads = read_threads(config)
         threads = extent(threads, extent_factor=4)
         threads = network(threads, config.getint('WEAVING', 'Shafts'))
-        inter_warp = interleave(threads, shafts=10, x_offset=200, y_offset=5)
-        inter_weft = interleave(threads, shafts=10, x_offset=0, y_offset=5)
+        inter_warp = interleave(threads, shafts=nof_shafts, x_offset=75, y_offset=nof_shafts/2)
+        inter_weft = interleave(threads, shafts=nof_shafts, x_offset=0, y_offset=0)
         write_wif(config, filename, inter_warp, inter_weft, nof_warp_color=2, nof_weft_color=2)
 
 
